@@ -1,0 +1,268 @@
+% Calculate the amplitude of BM waves based on the WKB approximation and information obtained by the experimental work of Emadi et al.
+
+% Code shows the effects at different stimili frequency. 
+
+%close all 
+clear all
+
+%The following variables set the parameters which define the BM wave. These
+%values apply to the cochlea of a small rodent (guinea pig/chinchilla) and
+%were fixed according to experimental data from such species. For a human
+%cochlea, the values should be altered accordingly.
+% Parameters: height of channel, density of fluid, mass at x=0, stiffness
+% at x=0, stiffness exp decay factor, mass exp increase factor.
+h=0.5e-3;   %Height of channel
+rho=1000;   %Fluid density
+K0=10;      %Stiffness function amplitude
+m0=32e-11;  %Mass function amplitude
+a=501;      %Exp decay factor
+b=101;      %Exp growth factor
+L=0.011;    %Length of cochlea
+eta=1e-6;   %Fluid viscosity
+
+dampFac=[10e-8, 5e-7, 2e-6 ]; %This has been fixed accordingly to experiemtal data to best match the amplitudes
+%of wave envelopes between SPL (60, 80 100). The tuning is however stll quite sharp. 
+arb=8e5;
+pressure=[0.02,  0.2, 2];%pressure scale factors between SPLs.
+%Geometric parameters D and W used to calcualte the area, A  of an 8um section
+%of the membrane.
+D=168e-6;
+W=204e-6;
+A=(W+D)*(8e-6)/2;
+BMpoints=979; %chose to match the number of BM points, found in the boundary file (number of faces/2  + 1)
+% Time parameters should be chosen to match the simulation
+T=0.002;
+dt=5e-6;
+t=[0:dt:T];
+timesteps=length(t);
+x=linspace(0, L,BMpoints);
+N=length(x);
+H=L/N;
+freq=[10000];
+omega=2*pi*freq; 
+
+
+% Empty arrays
+arrayFunc=zeros(1, N);
+final=zeros(length(omega), N);
+newmass= zeros(length(omega), N);
+kVector= zeros(length(omega), N);
+
+% exponential functions
+K=K0*exp(-a*x);
+m=m0*exp(b*x);
+
+%loop over SPLs 
+for count= 1:3
+    
+        arbitrary=arb*pressure(count);
+        damp=dampFac(count);
+        
+for i= 1:length(omega)
+    omega1=omega(i);
+    om=num2str(omega1);
+
+
+    C=sqrt(-2*1i*rho*omega1/h);
+    %C=sqrt(-1i)
+    cArray(i)=C;
+
+    %Impedence
+    Z1= (-1i*K/omega1).*(1-((omega1^2)*m./K))/A + damp/A;
+  
+
+    %Prefactor 
+    V=arbitrary*Z1.^(-3/4)./C;
+    vArray(i,:)= V;
+    
+    %Wave Vector
+    kVector= C./sqrt(Z1);
+    
+    %Integration function
+
+        for k= 2:N
+
+            func= trapz(x(1:k), kVector(1:k));
+            
+            arrayFunc(k)= func;
+            
+        end      
+  
+kVectorArray(i, :) = kVector; 
+
+%Full Function
+final(i, :)= V.*exp(-1i*arrayFunc);
+displacement(i,:)=final(i,:)./omega1;
+velEnv(i,:,count)=abs(final(i,:));
+dispEnv(i,:,count)=abs(displacement(i,:));
+%sensitvityCurve(i,count)= dispEnv(i,128);
+% figure(30)
+% subplot(1,2,1)
+% semilogy(x*1000,dispEnv(i,:,count)); hold on
+% xlabel('Longitudinal Location (mm)'); ylabel('Displacement (m)')
+% subplot(1,2,2)
+% semilogy(x*1000,(dispEnv(i,:,count)./pressure(count))*1e9); hold on
+% xlabel('Longitudinal Location (mm)'); ylabel('Sensitivity (nm/Pa)')
+% % env(i,:,p)= abs(final(i,:,p));
+% maxArray(i,p)= max(env(i,:,p));
+% envPrimeTemp(i,:,p)= diff(env(i,:,p));
+% envPrime(i, :,p)=[envPrimeTemp(i, :,p), 0];
+% 
+% %Steady Streaming Function
+% uSteadyNum(i, :,p)= ((env(i,:,p).^2).*(kVector)/(4*omega1)) - ((3*env(i,:,p).*envPrime(i, :,p))/(4*omega1)) - (env(i,:,p).^2/sqrt(8*eta*omega1));
+% usteadyMaximum(p,i)=max(abs(uSteadyNum(i,:)));
+% 
+% usteadyPart1(i,:,p)=abs(((env(i,:,p).^2).*(kVector)/(4*omega1)));
+% usteadyPart2(i,:,p)=abs((3*env(i,:,p).*envPrime(i, :,p)/(4*omega1)));
+% usteadyPart3(i,:,p)=abs((env(i,:,p).^2/sqrt(8*eta*omega1)));
+% 
+% 
+% usteady1Max(i,p)=max(usteadyPart1(i,:,p));
+% usteady2Max(i,p)=max(usteadyPart2(i,:,p));
+% usteady3Max(i,p)=max(usteadyPart3(i,:,p));
+%  
+% 
+
+% sensitivity(i, count)=(velEnv(i,150, count)./arbitrary);
+% dispArray(i,count)=dispEnv(i,150, count)
+% velArray=velEnv(i,150, count)
+
+% 
+% figure(1)
+% plot(dispEnv(i,:,count))
+% hold on; 
+end
+% 
+% figure(2)
+% axes1 = axes( 'Position',[0.11875 0.11 0.786250000000001 0.283404004711425]);
+% ax=gca;
+% hold(axes1, 'on');
+% ax.TickLabelInterpreter='latex';
+% ax.FontSize=32;
+% plot(x, displacement, 'b', 'Linewidth', 1.5)
+% % plot(x, dispEnv(1,:,3), '--k')
+% xlabel('x (mm)'); ylabel('y (mm)')
+% %dispDiffArray(count)= max(dispEnv(1,:))- dispEnv(1)
+% % 
+% % semilogy(x, dispEnv(i,:)./pressure(count)) 
+% hold on
+
+%yMatrix=zeros(length(t),length(x));
+
+%set(gcd, 'XLim', [0,max(x)], 'YLim', [-max(displacement), max(displacement)]);
+
+for i= 1:timesteps  
+    time=t(i);
+    y= displacement(1,:) .* (exp(1i*omega1*time));
+
+    yMatrix(i,:) = real(y);
+
+    x1=zeros(N); % need the x file to be a zero file
+    
+
+%     
+end
+yMatrix=flip(yMatrix,2);
+%yMatrix=zeros(size(yMatrix))
+dimMatrix(1,1)=length(t);
+dimMatrix(1,2)=length(x);
+dimMatrix=[20001, 979];
+%newYmatrix= [yMatrix, yMatrix];
+%semilogy(x, dispEnv(i,:,count))
+
+% save('dimensions_y.txt','dimMatrix','-ascii');
+%     save('matrix_y.txt','yMatrix','-ascii');
+%      save('matrix_x.txt','x1','-ascii');
+
+
+%loglog(dispEnv(i,:,count)./pressure(count))
+%loglog(dispEnv(i,:, count))
+
+end
+
+%%
+set(0,'defaulttextinterpreter','latex')
+semilogy(freq/1000, dispEnv(:,152,1)/(1e-9 *pressure(1)),'b', freq/1000, dispEnv(:,152,2)/(1e-9 *pressure(2)), 'r',  freq/1000, dispEnv(:,152,3)/(1e-9 *pressure(3)), 'g')
+xlabel('Freq (kHz)')
+ylabel("Sensitivity (nm/Pa)")
+ax=gca;
+ax.TickLabelInterpreter='latex';
+ax.FontSize=32;
+lgd.FontSize=36;
+legend('60 dB', '80dB', '100dB', 'Location','northeast')
+legend1 = legend(ax,'show');
+set(legend1, 'Interpreter','latex','EdgeColor',[1 1 1]);
+%%
+ N= 29; %number of oval window points
+ ovalLength=6.2500e-04;
+ dy= ovalLength/N;
+
+ base = ovalLength * ((N-2)/N); %removing 2 points leaves a % of the oval window length to be the triangle base
+ B=base/2 ;
+ xArray=linspace(0, base, 27);
+ %areaOval=trapz(x,yMatrix'-h)+ (h*L);
+ areaOval=trapz(x,matrixy');
+ %matrixx=matrixx{:,:};
+ 
+ save('matrix_y.txt','matrixy','-ascii');
+  %   save('matrix_x.txt','matrixx','-ascii');
+ 
+ %areaRound= trapz(x,yMatrix'+h)-(h*L);
+ heightOval=(2/base).*(areaOval);
+ %heightRound=(2/base).*(areaRound);
+ ovalXcoords=zeros( timesteps, N);
+ ovalYcoords= zeros(timesteps, N-2);
+ roundXcoords=zeros( timesteps, N);
+ roundYcoords= zeros(timesteps, N-2);
+
+for tt= 1:timesteps
+    gradientOval(tt)=(heightOval(tt))/B;
+    %gradientRound(tt)= (yArray(N/2) - yArray(2))/ (heightRound(tt));
+    
+    
+  ovalYcoords(tt, 1:14)=gradientOval(tt)*xArray(1:14);
+  c=base*gradientOval(tt);
+  ovalYcoords(tt,14:end)=-gradientOval(tt)*xArray(14:end) +c  ;
+  %figure(1);plot(ovalXcoords(tt,:));hold on; pause(0.2)
+  %plot(trapz(yArray, ovalXcoords(tt,:))); hold on; plot(areaOval(tt))
+  
+  %roundYcoords(tt, 2:N/2)=-yArray(2:N/2)/gradientRound(tt);
+ %roundYcoords(tt, N/2:end-2)=(yArray(N/2:end-2)- yArray(end-2))/gradientRound(tt) ;
+  %figure(2);plot(roundXcoords(tt,:)); hold on; pause(0.2)
+  %plot(trapz(yArray, roundXcoords(tt,:))); hold on; plot(areaRound(tt))
+  
+   
+   % ovalYcoords(tt,:)= -[0.001-00.000850648834148, 0.001-0.0009,0.001-0.000925,0.001- 0.00095, 0.001-0.000975,0.001- 0.001];
+    %ovalYcoords(tt,:)= -[0.00015, 0.000125, 0.0001, 0.000075, 0.00005, 0.000025];
+    %ovalYcoords(tt,:)= -[0.000025, 0.00005, 0.000075, 0.0001, 0.000125, 0.00015];
+%     
+%     figure(1)
+%     plot( xArray, roundYcoords(tt,:))
+%     figure(2)
+  
+   
+    %ovalYcoords(tt, :)= [0.000002, 0.000003, 0.000004, 0.000005,
+  
+end
+vec=zeros(timesteps,1);
+ovalYcoords=[vec,ovalYcoords, vec];
+
+roundYcoords=ovalYcoords;
+dimMatrixWindows= [timesteps, N];
+% save('dimensions_Oval.txt','dimMatrixWindows','-ascii');
+%     save('ovalYcoords.txt','ovalYcoords','-ascii');
+%      save('ovalXcoords.txt','ovalXcoords','-ascii');
+%      save('roundYcoords.txt','roundYcoords','-ascii');
+%      save('roundXcoords.txt','roundXcoords','-ascii');
+%    thing='done'     
+%      
+%    plot(ovalXcoords, yArray)
+% figure(2)
+% loglog(x, dispEnv(1,:,1),x, dispEnv(1,:,2),x, dispEnv(1,:,3)); hold on; 
+% loglog(x, dispEnv(2,:,1),x, dispEnv(2,:,2),x, dispEnv(2,:,3))
+% loglog(x, dispEnv(3,:,1),x, dispEnv(3,:,2),x, dispEnv(3,:,3))
+% loglog(x, dispEnv(4,:,1),x, dispEnv(4,:,2),x, dispEnv(4,:,3))
+% %figure(2); plot(x11,displacement/1e-9)
+%figure(2)
+%loglog(freq, sensitivity(:,1), freq, sensitivity(:,2), freq, sensitivity(:,3))
+%max(velEnv(1,:,:))-max(velEnv(2,:,:))
